@@ -43,30 +43,44 @@ export const TypeFlow: React.FC<TypeFlowProps> = ({
   charDelay,
   characterMultipliers,
 }) => {
+  console.log('something changed');
   const [content, setContent] = useState<string>('');
   const isTyping = useRef<boolean>(false);
+  const shouldCancel = useRef<boolean>(false);
 
   const text: string = React.Children.only(children).props.children;
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   useEffect(() => {
-    if (isTyping.current) return;
-
     const typeCharacter = async () => {
       isTyping.current = true;
       for (let i = 0; i < text.length; i++) {
-        setContent(prevContent => prevContent + text[i]);
+        if (shouldCancel.current) {
+          shouldCancel.current = false;
+          break;
+        }
+        setContent(currContent => (currContent += text[i])); // Set the state with the local content
         await delay(
           getcharDelayForCharacter(text[i], charDelay, characterMultipliers)
         );
       }
-      isTyping.current = false;
+      if (!shouldCancel.current) {
+        isTyping.current = false; // Only set to false if it wasn't canceled midway
+      }
     };
 
-    typeCharacter();
+    if (isTyping.current) shouldCancel.current = true; // Start by attempting to cancel any ongoing typing
 
-    return () => {};
+    // Introduce a small delay to ensure any ongoing promises finish, then restart the typing
+    delay(500).then(() => {
+      setContent(''); // Clear content before starting new typing
+      typeCharacter();
+    });
+
+    // return () => {
+    //   shouldCancel.current = true;
+    // };
   }, [text, charDelay]);
 
   return React.cloneElement(React.Children.only(children), {}, content);
